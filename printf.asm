@@ -20,19 +20,48 @@ global _start                  ; predefined entry point name for ld
             nop
 %endmacro
 
-_start:     mov rax, 0x01      ; write64 (rdi, rsi, rdx) ... r10, r8, r9
-            mov rdi, 1         ; stdout
-            mov rsi, Msg
-            mov rdx, MsgLen    ; strlen (Msg)
-            syscall
+_start:     mov rsi, Msg
+            xor rcx, rcx                ;rcx = 0 (args counter)
+            
+            dec rsi
+.ReadStr:   inc rsi
+            cmp byte [rsi], 0x0
+            je .ReadEnd
+            cmp byte [rsi], 0x25        ;"%" = 0x25
+            je .f25
+            jmp .ReadStr
+
+.f25:       inc rsi
+            cmp byte [rsi], 0x25        ;"%" = 0x25
+            je .ReadStr
+            inc rcx
+            jmp .ReadStr
+
+.ReadEnd:   mov rsi, Args
+            dec rcx
+            shl rcx, 3                  ;rcx *= 8
+            add rsi, rcx
+            shr rcx, 3                  ;rcx /= 8
+            inc rcx
+.PushArgs:  push qword [rsi]            ;push arg
+            sub rsi, 8                  ;8 byte args
+            loop .ReadEnd
 
             mov rsi, Msg
-            push 50
-            push Str
-            push rsi
+            push rsi                    ;string ptr
             call Printf
 
             EXIT0
+
+section     .data
+
+Msg:        db "Vlad %s %c La%xZar' %d %o yo %b", 0x0a, 0x0
+Args:       dq String1, 0x31, 0xDE, 15,  0xC8, 8
+
+String1:    db "Huesos", 0x0
+MsgLen      equ $ - Msg
+
+section     .text
 
 ;_______________________________________
 ;printf
@@ -160,12 +189,6 @@ section     .rodata
             dq .PrintHex                 ;[22] ----> %x
 
 section     .data
-
-
-Msg:        db "Vlad %s LaZar' %d", 0x0a, 0x0
-Str:        db "Huesos", 0x0
-MsgLen      equ $ - Msg
-
 Symb:       times 64 db 0x0             ;array for printing nums
 PrintFlag:  db 0
 
